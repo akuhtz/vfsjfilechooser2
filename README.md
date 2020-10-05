@@ -23,13 +23,13 @@ LICENSE.txt for details).
 How to include the artifact in your project:
 ```xml
     <dependency>
-      <groupId>com.github.fracpete</groupId>
+      <groupId>org.bidib.com.github.fracpete</groupId>
       <artifactId>vfsjfilechooser2</artifactId>
-      <version>0.2.8</version>
+      <version>0.2.9-SNAPSHOT</version>
     </dependency>
 ```
 
 Current project page:
 
-  https://github.com/fracpete/vfsjfilechooser2
+  https://github.com/akuhtz/vfsjfilechooser2
 
