@@ -25,7 +25,7 @@ How to include the artifact in your project:
     <dependency>
       <groupId>org.bidib.com.github.fracpete</groupId>
       <artifactId>vfsjfilechooser2</artifactId>
-      <version>0.2.9-SNAPSHOT</version>
+      <version>0.2.10</version>
     </dependency>
 ```
 
