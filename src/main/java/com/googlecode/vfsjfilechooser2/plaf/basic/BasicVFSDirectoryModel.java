@@ -17,20 +17,9 @@
  */
 package com.googlecode.vfsjfilechooser2.plaf.basic;
 
-
-import org.apache.commons.vfs2.FileObject;
-import org.apache.commons.vfs2.FileSystemException;
-
-import com.googlecode.vfsjfilechooser2.VFSJFileChooser;
-import com.googlecode.vfsjfilechooser2.constants.VFSJFileChooserConstants;
-import com.googlecode.vfsjfilechooser2.filechooser.AbstractVFSFileSystemView;
-import com.googlecode.vfsjfilechooser2.plaf.metal.MetalVFSFileChooserUI;
-import com.googlecode.vfsjfilechooser2.utils.FileObjectComparatorFactory;
-
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -47,34 +36,51 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.swing.AbstractListModel;
 import javax.swing.SwingUtilities;
 
+import org.apache.commons.vfs2.FileObject;
+import org.apache.commons.vfs2.FileSystemException;
+
+import com.googlecode.vfsjfilechooser2.VFSJFileChooser;
+import com.googlecode.vfsjfilechooser2.constants.VFSJFileChooserConstants;
+import com.googlecode.vfsjfilechooser2.filechooser.AbstractVFSFileSystemView;
+import com.googlecode.vfsjfilechooser2.plaf.metal.MetalVFSFileChooserUI;
+import com.googlecode.vfsjfilechooser2.utils.FileObjectComparatorFactory;
 
 /**
  * The DirectoryModel implementation based on Swing BasicDirectoryModel
+ * 
  * @author Yves Zoundi <yveszoundi at users dot sf dot net>, Jason Harrop <jasonharrop at users.sourceforge.net>
  * @version 0.0.1
  */
 @SuppressWarnings("serial")
-public class BasicVFSDirectoryModel extends AbstractListModel
-    implements PropertyChangeListener
-{
-    private static final Comparator<FileObject> fileNameComparator = FileObjectComparatorFactory.newFileNameComparator(true);
+public class BasicVFSDirectoryModel extends AbstractListModel implements PropertyChangeListener {
+    private static final Comparator<FileObject> fileNameComparator =
+        FileObjectComparatorFactory.newFileNameComparator(true);
+
     private VFSJFileChooser filechooser = null;
+
     private final List<FileObject> fileCache = new ArrayList<FileObject>();
+
     private ReadWriteLock aLock = new ReentrantReadWriteLock(true);
+
     private volatile Future<?> loadThread = null;
+
     private ExecutorService executor;
+
     private List<FileObject> files = null;
+
     private List<FileObject> directories = null;
+
     private int fetchID = 0;
+
     private PropertyChangeSupport changeSupport;
+
     private boolean busy = false;
 
     /**
      *
      * @param filechooser
      */
-    public BasicVFSDirectoryModel(VFSJFileChooser filechooser)
-    {
+    public BasicVFSDirectoryModel(VFSJFileChooser filechooser) {
         this.filechooser = filechooser;
         this.executor = Executors.newCachedThreadPool();
         validateFileCache();
@@ -84,39 +90,30 @@ public class BasicVFSDirectoryModel extends AbstractListModel
      *
      * @param e
      */
-    public void propertyChange(PropertyChangeEvent e)
-    {
+    @Override
+    public void propertyChange(PropertyChangeEvent e) {
         String prop = e.getPropertyName();
 
-        if ((prop.equals(VFSJFileChooserConstants.DIRECTORY_CHANGED_PROPERTY)) ||
-                (prop.equals(
-                    VFSJFileChooserConstants.FILE_VIEW_CHANGED_PROPERTY)) ||
-                (prop.equals(
-                    VFSJFileChooserConstants.FILE_FILTER_CHANGED_PROPERTY)) ||
-                (prop.equals(
-                    VFSJFileChooserConstants.FILE_HIDING_CHANGED_PROPERTY)) ||
-                (prop.equals(
-                    VFSJFileChooserConstants.FILE_SELECTION_MODE_CHANGED_PROPERTY)))
-        {
+        if ((prop.equals(VFSJFileChooserConstants.DIRECTORY_CHANGED_PROPERTY))
+            || (prop.equals(VFSJFileChooserConstants.FILE_VIEW_CHANGED_PROPERTY))
+            || (prop.equals(VFSJFileChooserConstants.FILE_FILTER_CHANGED_PROPERTY))
+            || (prop.equals(VFSJFileChooserConstants.FILE_HIDING_CHANGED_PROPERTY))
+            || (prop.equals(VFSJFileChooserConstants.FILE_SELECTION_MODE_CHANGED_PROPERTY))) {
             validateFileCache();
         }
-        else if ("UI".equals(prop))
-        {
+        else if ("UI".equals(prop)) {
             Object old = e.getOldValue();
 
-            if (old instanceof BasicVFSFileChooserUI)
-            {
+            if (old instanceof BasicVFSFileChooserUI) {
                 BasicVFSFileChooserUI ui = (BasicVFSFileChooserUI) old;
                 BasicVFSDirectoryModel model = ui.getModel();
 
-                if (model != null)
-                {
+                if (model != null) {
                     model.invalidateFileCache();
                 }
             }
         }
-        else if ("JFileChooserDialogIsClosingProperty".equals(prop))
-        {
+        else if ("JFileChooserDialogIsClosingProperty".equals(prop)) {
             invalidateFileCache();
         }
     }
@@ -124,10 +121,8 @@ public class BasicVFSDirectoryModel extends AbstractListModel
     /**
      * This method is used to interrupt file loading thread.
      */
-    public void invalidateFileCache()
-    {
-        if (loadThread != null)
-        {
+    public void invalidateFileCache() {
+        if (loadThread != null) {
             loadThread.cancel(true);
             loadThread = null;
         }
@@ -137,14 +132,11 @@ public class BasicVFSDirectoryModel extends AbstractListModel
      *
      * @return
      */
-    public List<FileObject> getFiles()
-    {
+    public List<FileObject> getFiles() {
         aLock.readLock().lock();
 
-        try
-        {
-            if (files != null)
-            {
+        try {
+            if (files != null) {
                 return files;
             }
 
@@ -155,22 +147,18 @@ public class BasicVFSDirectoryModel extends AbstractListModel
             AbstractVFSFileSystemView v = filechooser.getFileSystemView();
             directories.add(v.createFileObject(currentDir, ".."));
 
-            for (FileObject f : fileCache)
-            {
-                if (filechooser.isTraversable(f))
-                {
+            for (FileObject f : fileCache) {
+                if (filechooser.isTraversable(f)) {
                     directories.add(f);
                 }
-                else
-                {
+                else {
                     files.add(f);
                 }
             }
 
             return files;
         }
-        finally
-        {
+        finally {
             aLock.readLock().unlock();
         }
     }
@@ -178,62 +166,51 @@ public class BasicVFSDirectoryModel extends AbstractListModel
     /**
      *
      */
-    public void validateFileCache()
-    {
+    public void validateFileCache() {
         FileObject currentDirectory = filechooser.getCurrentDirectoryObject();
 
-        if (currentDirectory == null)
-        {
+        if (currentDirectory == null) {
             return;
         }
 
-        try
-        {
+        try {
             currentDirectory.refresh();
         }
-        catch (FileSystemException ex)
-        {
+        catch (FileSystemException ex) {
         }
 
-        if (loadThread != null)
-        {
+        if (loadThread != null) {
             loadThread.cancel(true);
         }
 
         setBusy(true, ++fetchID);
 
-        loadThread = executor.submit(new LoadFilesThread(currentDirectory,
-                    fetchID));
+        loadThread = executor.submit(new LoadFilesThread(currentDirectory, fetchID));
     }
 
     /**
      * Renames a file in the underlying file system.
      *
-     * @param oldFile a <code>File</code> object representing
-     *        the existing file
-     * @param newFile a <code>File</code> object representing
-     *        the desired new file name
-     * @return <code>true</code> if rename succeeded,
-     *        otherwise <code>false</code>
+     * @param oldFile
+     *            a <code>File</code> object representing the existing file
+     * @param newFile
+     *            a <code>File</code> object representing the desired new file name
+     * @return <code>true</code> if rename succeeded, otherwise <code>false</code>
      * @since 1.4
      */
-    public boolean renameFile(FileObject oldFile, FileObject newFile)
-    {
+    public boolean renameFile(FileObject oldFile, FileObject newFile) {
         aLock.writeLock().lock();
 
-        try
-        {
+        try {
             oldFile.moveTo(newFile);
             validateFileCache();
 
             return true;
         }
-        catch (Exception e)
-        {
+        catch (Exception e) {
             return false;
         }
-        finally
-        {
+        finally {
             aLock.writeLock().unlock();
         }
     }
@@ -241,13 +218,12 @@ public class BasicVFSDirectoryModel extends AbstractListModel
     /**
      *
      */
-    public void fireContentsChanged()
-    {
+    public void fireContentsChanged() {
         fireContentsChanged(this, 0, getSize() - 1);
     }
 
-    public int getSize()
-    {
+    @Override
+    public int getSize() {
         return fileCache.size();
     }
 
@@ -256,8 +232,7 @@ public class BasicVFSDirectoryModel extends AbstractListModel
      * @param o
      * @return
      */
-    public boolean contains(Object o)
-    {
+    public boolean contains(Object o) {
         return fileCache.contains(o);
     }
 
@@ -265,24 +240,24 @@ public class BasicVFSDirectoryModel extends AbstractListModel
      * @param o
      * @return
      */
-    public int indexOf(Object o)
-    {
+    public int indexOf(Object o) {
         return fileCache.indexOf(o);
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see javax.swing.ListModel#getElementAt(int)
      */
-    public Object getElementAt(int index)
-    {
+    @Override
+    public Object getElementAt(int index) {
         return fileCache.get(index);
     }
 
     /**
      * @param comparator
      */
-    public void sort(Comparator<FileObject> comparator)
-    {
+    public void sort(Comparator<FileObject> comparator) {
         Collections.sort(fileCache, comparator);
     }
 
@@ -290,29 +265,26 @@ public class BasicVFSDirectoryModel extends AbstractListModel
      *
      * @param v
      */
-    protected void sort(List<FileObject> v)
-    {
+    protected void sort(List<FileObject> v) {
         Collections.sort(v, fileNameComparator);
     }
 
     /**
-     * Adds a PropertyChangeListener to the listener list. The listener is
-     * registered for all bound properties of this class.
+     * Adds a PropertyChangeListener to the listener list. The listener is registered for all bound properties of this
+     * class.
      * <p>
-     * If <code>listener</code> is <code>null</code>,
-     * no exception is thrown and no action is performed.
+     * If <code>listener</code> is <code>null</code>, no exception is thrown and no action is performed.
      *
-     * @param    listener  the property change listener to be added
+     * @param listener
+     *            the property change listener to be added
      *
      * @see #removePropertyChangeListener
      * @see #getPropertyChangeListeners
      *
      * @since 1.6
      */
-    public void addPropertyChangeListener(PropertyChangeListener listener)
-    {
-        if (changeSupport == null)
-        {
+    public void addPropertyChangeListener(PropertyChangeListener listener) {
+        if (changeSupport == null) {
             changeSupport = new PropertyChangeSupport(this);
         }
 
@@ -324,39 +296,34 @@ public class BasicVFSDirectoryModel extends AbstractListModel
      * <p>
      * If listener is null, no exception is thrown and no action is performed.
      *
-     * @param listener the PropertyChangeListener to be removed
+     * @param listener
+     *            the PropertyChangeListener to be removed
      *
      * @see #addPropertyChangeListener
      * @see #getPropertyChangeListeners
      *
      * @since 1.6
      */
-    public void removePropertyChangeListener(PropertyChangeListener listener)
-    {
-        if (changeSupport != null)
-        {
+    public void removePropertyChangeListener(PropertyChangeListener listener) {
+        if (changeSupport != null) {
             changeSupport.removePropertyChangeListener(listener);
         }
     }
 
     /**
-     * Returns an array of all the property change listeners
-     * registered on this component.
+     * Returns an array of all the property change listeners registered on this component.
      *
-     * @return all of this component's <code>PropertyChangeListener</code>s
-     *         or an empty array if no property change
+     * @return all of this component's <code>PropertyChangeListener</code>s or an empty array if no property change
      *         listeners are currently registered
      *
-     * @see      #addPropertyChangeListener
-     * @see      #removePropertyChangeListener
-     * @see      java.beans.PropertyChangeSupport#getPropertyChangeListeners
+     * @see #addPropertyChangeListener
+     * @see #removePropertyChangeListener
+     * @see java.beans.PropertyChangeSupport#getPropertyChangeListeners
      *
      * @since 1.6
      */
-    public PropertyChangeListener[] getPropertyChangeListeners()
-    {
-        if (changeSupport == null)
-        {
+    public PropertyChangeListener[] getPropertyChangeListeners() {
+        if (changeSupport == null) {
             return new PropertyChangeListener[0];
         }
 
@@ -364,133 +331,118 @@ public class BasicVFSDirectoryModel extends AbstractListModel
     }
 
     /**
-     * Support for reporting bound property changes for boolean properties.
-     * This method can be called when a bound property has changed and it will
-     * send the appropriate PropertyChangeEvent to any registered
+     * Support for reporting bound property changes for boolean properties. This method can be called when a bound
+     * property has changed and it will send the appropriate PropertyChangeEvent to any registered
      * PropertyChangeListeners.
      *
-     * @param propertyName the property whose value has changed
-     * @param oldValue the property's previous value
-     * @param newValue the property's new value
+     * @param propertyName
+     *            the property whose value has changed
+     * @param oldValue
+     *            the property's previous value
+     * @param newValue
+     *            the property's new value
      *
      * @since 1.6
      */
-    protected void firePropertyChange(String propertyName, Object oldValue,
-        Object newValue)
-    {
-        if (changeSupport != null)
-        {
+    protected void firePropertyChange(String propertyName, Object oldValue, Object newValue) {
+        if (changeSupport != null) {
             changeSupport.firePropertyChange(propertyName, oldValue, newValue);
         }
     }
 
     /**
-     * Set the busy state for the model. The model is considered
-     * busy when it is running a separate (interruptable)
+     * Set the busy state for the model. The model is considered busy when it is running a separate (interruptable)
      * thread in order to load the contents of a directory.
      */
-    private void setBusy(final boolean busy, int fid)
-    {
+    private void setBusy(final boolean busy, int fid) {
         aLock.writeLock().lock();
 
-        try
-        {
-            if (fid == fetchID)
-            {
+        try {
+            if (fid == fetchID) {
                 boolean oldValue = this.busy;
                 this.busy = busy;
 
-                if ((changeSupport != null) && (busy != oldValue))
-                {
-                    Runnable r = (new Runnable()
-                        {
-                            public void run()
-                            {
-                                firePropertyChange("busy", !busy, busy);
-                            }
-                        });
+                if ((changeSupport != null) && (busy != oldValue)) {
+                    Runnable r = (new Runnable() {
+                        @Override
+                        public void run() {
+                            firePropertyChange("busy", !busy, busy);
+                        }
+                    });
 
-                    if (SwingUtilities.isEventDispatchThread())
-                    {
+                    if (SwingUtilities.isEventDispatchThread()) {
                         r.run();
                     }
-                    else
-                    {
+                    else {
                         SwingUtilities.invokeLater(r);
                     }
                 }
             }
         }
-        finally
-        {
+        finally {
             aLock.writeLock().unlock();
         }
     }
 
-    class LoadFilesThread implements Runnable
-    {
+    class LoadFilesThread implements Runnable {
         private int fid;
+
         private Queue<DoChangeContents> runnables = new ConcurrentLinkedQueue<DoChangeContents>();
 
-        public LoadFilesThread(FileObject currentDirectory, int fid)
-        {
+        public LoadFilesThread(FileObject currentDirectory, int fid) {
             this.fid = fid;
         }
 
-        private void invokeLater(DoChangeContents runnable)
-        {
+        private void invokeLater(DoChangeContents runnable) {
             runnables.add(runnable);
 
-            if (SwingUtilities.isEventDispatchThread())
-            {
+            if (SwingUtilities.isEventDispatchThread()) {
                 runnable.run();
             }
-            else
-            {
+            else {
                 SwingUtilities.invokeLater(runnable);
             }
         }
 
-        public void run()
-        {
+        @Override
+        public void run() {
             run0();
             setBusy(false, fid);
         }
 
-        public void run0()
-        {
+        public void run0() {
             AbstractVFSFileSystemView fileSystem = filechooser.getFileSystemView();
 
-            FileObject cwd = filechooser.getCurrentDirectoryObject();
+            final FileObject cwd = filechooser.getCurrentDirectoryObject();
 
             // fix a bug here when the filesystem changes, the directories list needs to be notified
-            if (!contains(cwd))
-            {
+            if (!contains(cwd)) {
                 MetalVFSFileChooserUI ui = (MetalVFSFileChooserUI) filechooser.getUI();
-                ui.getCombo().setSelectedItem(cwd);
+                if (SwingUtilities.isEventDispatchThread()) {
+                    ui.getCombo().setSelectedItem(cwd);
+                }
+                else {
+                    SwingUtilities.invokeLater(() -> ui.getCombo().setSelectedItem(cwd));
+                }
+                // ui.getCombo().setSelectedItem(cwd);
             }
 
-            FileObject[] list = fileSystem.getFiles(cwd,
-                    filechooser.isFileHidingEnabled());
+            FileObject[] list = fileSystem.getFiles(cwd, filechooser.isFileHidingEnabled());
 
             List<FileObject> acceptsList = new ArrayList<FileObject>(list.length);
 
-            if ((loadThread != null) && loadThread.isCancelled())
-            {
+            if ((loadThread != null) && loadThread.isCancelled()) {
                 return;
             }
 
             // run through the file list, add directories and selectable files to fileCache
-            for (FileObject aFileObject : list)
-            {
-                if (filechooser.accept(aFileObject))
-                {
+            for (FileObject aFileObject : list) {
+                if (filechooser.accept(aFileObject)) {
                     acceptsList.add(aFileObject);
                 }
             }
 
-            if ((loadThread != null) && loadThread.isCancelled())
-            {
+            if ((loadThread != null) && loadThread.isCancelled()) {
                 cancelRunnables();
 
                 return;
@@ -505,21 +457,17 @@ public class BasicVFSDirectoryModel extends AbstractListModel
             List<FileObject> newFiles = new ArrayList<FileObject>(mid);
 
             // run through list grabbing directories in chunks of ten
-            for (FileObject f : acceptsList)
-            {
+            for (FileObject f : acceptsList) {
                 boolean isTraversable = filechooser.isTraversable(f);
 
-                if (isTraversable)
-                {
+                if (isTraversable) {
                     newDirectories.add(f);
                 }
-                else
-                {
+                else {
                     newFiles.add(f);
                 }
 
-                if ((loadThread != null) && loadThread.isCancelled())
-                {
+                if ((loadThread != null) && loadThread.isCancelled()) {
                     cancelRunnables();
 
                     return;
@@ -532,22 +480,17 @@ public class BasicVFSDirectoryModel extends AbstractListModel
             int newSize = newFileCache.size();
             int oldSize = fileCache.size();
 
-            if (newSize > oldSize)
-            {
-                //see if interval is added
+            if (newSize > oldSize) {
+                // see if interval is added
                 int start = oldSize;
                 int end = newSize;
 
-                for (int i = 0; i < oldSize; i++)
-                {
-                    if (!newFileCache.get(i).equals(fileCache.get(i)))
-                    {
+                for (int i = 0; i < oldSize; i++) {
+                    if (!newFileCache.get(i).equals(fileCache.get(i))) {
                         start = i;
 
-                        for (int j = i; j < newSize; j++)
-                        {
-                            if (newFileCache.get(j).equals(fileCache.get(i)))
-                            {
+                        for (int j = i; j < newSize; j++) {
+                            if (newFileCache.get(j).equals(fileCache.get(i))) {
                                 end = j;
 
                                 break;
@@ -558,32 +501,25 @@ public class BasicVFSDirectoryModel extends AbstractListModel
                     }
                 }
 
-                if ((start >= 0) && (end > start) &&
-                        newFileCache.subList(end, newSize)
-                                        .equals(fileCache.subList(start, oldSize)))
-                {
-                    if ((loadThread != null) && loadThread.isCancelled())
-                    {
+                if ((start >= 0) && (end > start)
+                    && newFileCache.subList(end, newSize).equals(fileCache.subList(start, oldSize))) {
+                    if ((loadThread != null) && loadThread.isCancelled()) {
                         cancelRunnables();
 
                         return;
                     }
 
-                    invokeLater(new DoChangeContents(newFileCache.subList(
-                                start, end), start, null, 0, fid));
+                    invokeLater(new DoChangeContents(newFileCache.subList(start, end), start, null, 0, fid));
                     newFileCache = null;
                 }
             }
-            else if (newSize < oldSize)
-            {
-                //see if interval is removed
+            else if (newSize < oldSize) {
+                // see if interval is removed
                 int start = -1;
                 int end = -1;
 
-                for (int i = 0; i < newSize; i++)
-                {
-                    if (!newFileCache.get(i).equals(fileCache.get(i)))
-                    {
+                for (int i = 0; i < newSize; i++) {
+                    if (!newFileCache.get(i).equals(fileCache.get(i))) {
                         start = i;
                         end = (i + oldSize) - newSize;
 
@@ -591,66 +527,59 @@ public class BasicVFSDirectoryModel extends AbstractListModel
                     }
                 }
 
-                if ((start >= 0) && (end > start) &&
-                        fileCache.subList(end, oldSize)
-                                     .equals(newFileCache.subList(start, newSize)))
-                {
-                    if ((loadThread != null) && loadThread.isCancelled())
-                    {
+                if ((start >= 0) && (end > start)
+                    && fileCache.subList(end, oldSize).equals(newFileCache.subList(start, newSize))) {
+                    if ((loadThread != null) && loadThread.isCancelled()) {
                         cancelRunnables(runnables);
 
                         return;
                     }
 
-                    invokeLater(new DoChangeContents(null, 0,
-                            new ArrayList<FileObject>(fileCache.subList(start,
-                                    end)), start, fid));
+                    invokeLater(new DoChangeContents(null, 0, new ArrayList<FileObject>(fileCache.subList(start, end)),
+                        start, fid));
                     newFileCache = null;
                 }
             }
 
-            if ((newFileCache != null) && !fileCache.equals(newFileCache))
-            {
-                if ((loadThread != null) && loadThread.isCancelled())
-                {
+            if ((newFileCache != null) && !fileCache.equals(newFileCache)) {
+                if ((loadThread != null) && loadThread.isCancelled()) {
                     cancelRunnables(runnables);
 
                     return;
                 }
 
-                invokeLater(new DoChangeContents(newFileCache, 0, fileCache, 0,
-                        fid));
+                invokeLater(new DoChangeContents(newFileCache, 0, fileCache, 0, fid));
             }
         }
 
-        public void cancelRunnables(Queue<DoChangeContents> runnables)
-        {
+        public void cancelRunnables(Queue<DoChangeContents> runnables) {
             DoChangeContents runnable = null;
 
-            while ((runnable = runnables.poll()) != null)
-            {
+            while ((runnable = runnables.poll()) != null) {
                 runnable.cancel();
             }
         }
 
-        public void cancelRunnables()
-        {
+        public void cancelRunnables() {
             cancelRunnables(runnables);
         }
     }
 
-    class DoChangeContents implements Runnable
-    {
+    class DoChangeContents implements Runnable {
         private List<FileObject> addFiles;
+
         private List<FileObject> remFiles;
+
         private boolean doFire = true;
+
         private int fid;
+
         private int addStart = 0;
+
         private int remStart = 0;
 
-        public DoChangeContents(List<FileObject> addFiles, int addStart,
-            List<FileObject> remFiles, int remStart, int fid)
-        {
+        public DoChangeContents(List<FileObject> addFiles, int addStart, List<FileObject> remFiles, int remStart,
+            int fid) {
             this.addFiles = addFiles;
             this.addStart = addStart;
             this.remFiles = remFiles;
@@ -658,62 +587,48 @@ public class BasicVFSDirectoryModel extends AbstractListModel
             this.fid = fid;
         }
 
-        void cancel()
-        {
+        void cancel() {
             aLock.writeLock().lock();
 
-            try
-            {
+            try {
                 doFire = false;
             }
-            finally
-            {
+            finally {
                 aLock.writeLock().unlock();
             }
         }
 
-        public void run()
-        {
-            if ((fetchID == fid) && doFire)
-            {
+        @Override
+        public void run() {
+            if ((fetchID == fid) && doFire) {
                 int remSize = (remFiles == null) ? 0 : remFiles.size();
                 int addSize = (addFiles == null) ? 0 : addFiles.size();
 
                 aLock.writeLock().lock();
 
-                try
-                {
-                    if (remSize > 0)
-                    {
+                try {
+                    if (remSize > 0) {
                         fileCache.removeAll(remFiles);
                     }
 
-                    if (addSize > 0)
-                    {
+                    if (addSize > 0) {
                         fileCache.addAll(addStart, addFiles);
                     }
 
                     files = null;
                     directories = null;
                 }
-                finally
-                {
+                finally {
                     aLock.writeLock().unlock();
                 }
 
-                if ((remSize > 0) && (addSize == 0))
-                {
-                    fireIntervalRemoved(BasicVFSDirectoryModel.this, remStart,
-                        (remStart + remSize) - 1);
+                if ((remSize > 0) && (addSize == 0)) {
+                    fireIntervalRemoved(BasicVFSDirectoryModel.this, remStart, (remStart + remSize) - 1);
                 }
-                else if ((addSize > 0) && (remSize == 0) &&
-                        (fileCache.size() > addSize))
-                {
-                    fireIntervalAdded(BasicVFSDirectoryModel.this, addStart,
-                        (addStart + addSize) - 1);
+                else if ((addSize > 0) && (remSize == 0) && (fileCache.size() > addSize)) {
+                    fireIntervalAdded(BasicVFSDirectoryModel.this, addStart, (addStart + addSize) - 1);
                 }
-                else
-                {
+                else {
                     fireContentsChanged();
                 }
             }
